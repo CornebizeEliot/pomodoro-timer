@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minuteur Pomodoro</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevent scroll */
+        }
+        .container {
+            max-width: 90%;
+            width: 500px;
+            background-color: #ffffff;
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2.5rem; /* Increased padding */
+            text-align: center;
+        }
+        .timer-display {
+            font-size: 5rem; /* Larger font size */
+            font-weight: bold;
+            color: #334155; /* Darker text for timer */
+            margin-bottom: 2rem;
+            letter-spacing: 0.05em; /* Slightly spaced out numbers */
+        }
+        .button-group button {
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .button-group button:hover {
+            transform: translateY(-2px);
+        }
+        .button-group button:active {
+            transform: translateY(0);
+        }
+        /* Custom styles for better button appearance */
+        .btn-primary {
+            background-color: #4f46e5; /* Indigo */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; /* Rounded */
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary:hover {
+            background-color: #4338ca; /* Darker indigo */
+        }
+        .btn-secondary {
+            background-color: #6b7280; /* Gray */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563; /* Darker gray */
+        }
+        .btn-green {
+            background-color: #10b981; /* Emerald green */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-green:hover {
+            background-color: #059669; /* Darker emerald */
+        }
+        .tab-button {
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .tab-button.active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .tab-button:not(.active):hover {
+            background-color: #e2e8f0; /* Light gray on hover */
+        }
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #ffffff;
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            position: relative;
+        }
+        .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none; /* Chrome, Safari, Edge */
+            margin: 0;
+        }
+        .suggestion-box {
+            min-height: 3rem; /* Ensure some height even when empty */
+            display: flex;
+            align-items: center; /* Vertically center content */
+            justify-content: center; /* Horizontally center content */
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="font-inter">
+    <div class="container">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6">Minuteur Pomodoro</h1>
+
+        <div class="flex justify-center space-x-4 mb-8 bg-gray-100 p-2 rounded-xl">
+            <button id="work-tab" class="tab-button active">Travail</button>
+            <button id="short-break-tab" class="tab-button">Pause courte</button>
+            <button id="long-break-tab" class="tab-button">Pause longue</button>
+        </div>
+
+        <div id="timer-display" class="timer-display">25:00</div>
+
+        <div class="button-group flex justify-center space-x-4 mb-8">
+            <button id="start-button" class="btn-primary">Démarrer</button>
+            <button id="pause-button" class="btn-secondary hidden">Pause</button>
+            <button id="reset-button" class="btn-secondary">Réinitialiser</button>
+        </div>
+
+        <!-- LLM-powered feature: Break Activity Suggestion -->
+        <button id="get-break-suggestion" class="btn-primary mt-4 hidden">Suggestion de pause ✨</button>
+        <div id="suggestion-box" class="mt-4 p-4 bg-blue-100 text-blue-800 rounded-lg hidden suggestion-box"></div>
+
+        <!-- New LLM-powered feature: Daily Reflection Prompt -->
+        <button id="get-reflection-prompt" class="btn-primary mt-4 hidden">Réflexion Quotidienne ✨</button>
+        <div id="reflection-box" class="mt-4 p-4 bg-purple-100 text-purple-800 rounded-lg hidden suggestion-box"></div>
+
+
+        <button id="settings-button" class="btn-green text-sm mt-4">Paramètres</button>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="settings-modal hidden">
+        <div class="modal-content">
+            <button id="close-settings" class="close-button">&times;</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Paramètres du minuteur</h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="work-duration" class="block text-gray-700 text-left mb-1">Durée du travail (minutes) :</label>
+                    <input type="number" id="work-duration" min="1" max="60" value="25"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="short-break-duration" class="block text-gray-700 text-left mb-1">Durée de la pause courte (minutes) :</label>
+                    <input type="number" id="short-break-duration" min="1" max="30" value="5"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="long-break-duration" class="block text-gray-700 text-left mb-1">Durée de la pause longue (minutes) :</label>
+                    <input type="number" id="long-break-duration" min="1" max="60" value="15"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="pomodoro-cycles" class="block text-gray-700 text-left mb-1">Cycles Pomodoro avant pause longue :</label>
+                    <input type="number" id="pomodoro-cycles" min="1" max="10" value="4"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <button id="save-settings" class="btn-primary w-full mt-8">Enregistrer les paramètres</button>
+        </div>
+    </div>
+
+    <audio id="timer-end-sound" src="https://www.soundjay.com/buttons/beep-07a.mp3" preload="auto"></audio>
+
+    <script>
+        // DOM Elements
+        const timerDisplay = document.getElementById('timer-display');
+        const startButton = document.getElementById('start-button');
+        const pauseButton = document.getElementById('pause-button');
+        const resetButton = document.getElementById('reset-button');
+        const settingsButton = document.getElementById('settings-button');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettingsButton = document.getElementById('close-settings');
+        const saveSettingsButton = document.getElementById('save-settings');
+        const workDurationInput = document.getElementById('work-duration');
+        const shortBreakDurationInput = document.getElementById('short-break-duration');
+        const longBreakDurationInput = document.getElementById('long-break-duration');
+        const pomodoroCyclesInput = document.getElementById('pomodoro-cycles');
+        const workTab = document.getElementById('work-tab');
+        const shortBreakTab = document.getElementById('short-break-tab');
+        const longBreakTab = document.getElementById('long-break-tab');
+        const timerEndSound = document.getElementById('timer-end-sound');
+
+        // LLM feature DOM Elements
+        const getBreakSuggestionButton = document.getElementById('get-break-suggestion');
+        const suggestionBox = document.getElementById('suggestion-box');
+        const getReflectionPromptButton = document.getElementById('get-reflection-prompt'); // New element
+        const reflectionBox = document.getElementById('reflection-box'); // New element
+
+        // Timer Variables
+        let timer; // Holds setInterval ID
+        let isRunning = false;
+        let currentMode = 'work'; // 'work', 'short-break', 'long-break'
+        let timeRemaining; // in seconds
+        let pomodoroCount = 0;
+
+        // Default Durations (in minutes)
+        let workDuration = 25;
+        let shortBreakDuration = 5;
+        let longBreakDuration = 15;
+        let pomodoroCycles = 4; // Number of work sessions before a long break
+
+        // Function to update the timer display
+        function updateDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            timerDisplay.textContent = `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        }
+
+        // Function to start the timer
+        function startTimer() {
+            if (isRunning) return; // Prevent multiple timers
+            isRunning = true;
+            startButton.classList.add('hidden');
+            pauseButton.classList.remove('hidden');
+            // Hide LLM feature elements when timer starts
+            suggestionBox.classList.add('hidden');
+            suggestionBox.textContent = '';
+            getBreakSuggestionButton.classList.add('hidden'); // Hide break suggestion button
+            reflectionBox.classList.add('hidden'); // Hide reflection box
+            reflectionBox.textContent = '';
+            getReflectionPromptButton.classList.add('hidden'); // Hide reflection button
+
+            timer = setInterval(() => {
+                timeRemaining--;
+                updateDisplay();
+
+                if (timeRemaining <= 0) {
+                    clearInterval(timer);
+                    isRunning = false;
+                    timerEndSound.play();
+                    handleTimerEnd();
+                }
+            }, 1000);
+        }
+
+        // Function to pause the timer
+        function pauseTimer() {
+            if (!isRunning) return;
+            clearInterval(timer);
+            isRunning = false;
+            startButton.classList.remove('hidden');
+            pauseButton.classList.add('hidden');
+        }
+
+        // Function to reset the timer based on the current mode
+        function resetTimer() {
+            clearInterval(timer);
+            isRunning = false;
+            startButton.classList.remove('hidden');
+            pauseButton.classList.add('hidden');
+            // Hide LLM feature elements when timer resets
+            suggestionBox.classList.add('hidden');
+            suggestionBox.textContent = '';
+            getBreakSuggestionButton.classList.add('hidden');
+            reflectionBox.classList.add('hidden');
+            reflectionBox.textContent = '';
+            getReflectionPromptButton.classList.add('hidden');
+            setMode(currentMode); // Reset to the current mode's duration
+        }
+
+        // Function to handle timer ending
+        function handleTimerEnd() {
+            if (currentMode === 'work') {
+                pomodoroCount++;
+                // Show reflection prompt button after a work session
+                getReflectionPromptButton.classList.remove('hidden');
+                if (pomodoroCount % pomodoroCycles === 0) {
+                    setMode('long-break');
+                } else {
+                    setMode('short-break');
+                }
+            } else { // It was a break
+                setMode('work');
+            }
+            startTimer(); // Automatically start the next session
+        }
+
+        // Function to set the timer mode (work, short-break, long-break)
+        function setMode(mode) {
+            currentMode = mode;
+            let duration;
+
+            // Remove active class from all tabs
+            workTab.classList.remove('active');
+            shortBreakTab.classList.remove('active');
+            longBreakTab.classList.remove('active');
+
+            // Hide all LLM feature buttons and clear boxes by default
+            getBreakSuggestionButton.classList.add('hidden');
+            suggestionBox.classList.add('hidden');
+            suggestionBox.textContent = '';
+            getReflectionPromptButton.classList.add('hidden');
+            reflectionBox.classList.add('hidden');
+            reflectionBox.textContent = '';
+
+
+            // Set duration and add active class to the current tab
+            if (mode === 'work') {
+                duration = workDuration;
+                workTab.classList.add('active');
+            } else if (mode === 'short-break') {
+                duration = shortBreakDuration;
+                shortBreakTab.classList.add('active');
+                getBreakSuggestionButton.classList.remove('hidden'); // Show break suggestion button for breaks
+            } else if (mode === 'long-break') {
+                duration = longBreakDuration;
+                longBreakTab.classList.add('active');
+                getBreakSuggestionButton.classList.remove('hidden'); // Show break suggestion button for breaks
+            }
+            timeRemaining = duration * 60;
+            updateDisplay();
+        }
+
+        // Function to get break suggestion from Gemini API
+        async function getBreakSuggestion() {
+            suggestionBox.classList.remove('hidden');
+            suggestionBox.textContent = 'Génération de suggestion...'; // Loading indicator
+
+            const prompt = `Suggest a quick, refreshing activity for a ${currentMode === 'short-break' ? 'short' : 'long'} break during a Pomodoro work session. Keep it concise, one sentence.`;
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // Canvas will provide this at runtime
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    suggestionBox.textContent = text;
+                } else {
+                    suggestionBox.textContent = 'Désolé, impossible de générer une suggestion pour le moment.';
+                    console.error('Gemini API response structure unexpected:', result);
+                }
+            } catch (error) {
+                suggestionBox.textContent = 'Erreur lors de la connexion à l\'API Gemini.';
+                console.error('Error calling Gemini API:', error);
+            }
+        }
+
+        // Function to get daily reflection prompt from Gemini API
+        async function getReflectionPrompt() {
+            reflectionBox.classList.remove('hidden');
+            reflectionBox.textContent = 'Génération de la question de réflexion...'; // Loading indicator
+
+            const prompt = `Provide a concise, encouraging prompt for a user to reflect on their recent work session or plan their next steps, in the context of a Pomodoro technique. Make it one sentence.`;
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // Canvas will provide this at runtime
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    reflectionBox.textContent = text;
+                } else {
+                    reflectionBox.textContent = 'Désolé, impossible de générer une question de réflexion pour le moment.';
+                    console.error('Gemini API response structure unexpected:', result);
+                }
+            } catch (error) {
+                reflectionBox.textContent = 'Erreur lors de la connexion à l\'API Gemini.';
+                console.error('Error calling Gemini API:', error);
+            }
+        }
+
+        // Event Listeners for buttons
+        startButton.addEventListener('click', startTimer);
+        pauseButton.addEventListener('click', pauseTimer);
+        resetButton.addEventListener('click', resetTimer);
+        getBreakSuggestionButton.addEventListener('click', getBreakSuggestion);
+        getReflectionPromptButton.addEventListener('click', getReflectionPrompt); // New event listener
+
+        // Settings Modal Logic
+        settingsButton.addEventListener('click', () => {
+            // Load current settings into inputs
+            workDurationInput.value = workDuration;
+            shortBreakDurationInput.value = shortBreakDuration;
+            longBreakDurationInput.value = longBreakDuration;
+            pomodoroCyclesInput.value = pomodoroCycles;
+            settingsModal.classList.remove('hidden');
+        });
+
+        closeSettingsButton.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+
+        saveSettingsButton.addEventListener('click', () => {
+            workDuration = parseInt(workDurationInput.value);
+            shortBreakDuration = parseInt(shortBreakDurationInput.value);
+            longBreakDuration = parseInt(longBreakDurationInput.value);
+            pomodoroCycles = parseInt(pomodoroCyclesInput.value);
+
+            // Ensure values are valid
+            if (isNaN(workDuration) || workDuration < 1) workDuration = 25;
+            if (isNaN(shortBreakDuration) || shortBreakDuration < 1) shortBreakDuration = 5;
+            if (isNaN(longBreakDuration) || longBreakDuration < 1) longBreakDuration = 15;
+            if (isNaN(pomodoroCycles) || pomodoroCycles < 1) pomodoroCycles = 4;
+
+            settingsModal.classList.add('hidden');
+            // Reset timer with new settings if it's not running
+            if (!isRunning) {
+                setMode(currentMode);
+            }
+        });
+
+        // Tab switching logic
+        workTab.addEventListener('click', () => {
+            if (!isRunning) { // Only allow changing mode if timer is not running
+                setMode('work');
+            }
+        });
+
+        shortBreakTab.addEventListener('click', () => {
+            if (!isRunning) {
+                setMode('short-break');
+            }
+        });
+
+        longBreakTab.addEventListener('click', () => {
+            if (!isRunning) {
+                setMode('long-break');
+            }
+        });
+
+        // Initialize the timer display on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            setMode('work'); // Start in work mode
+        });
+    </script>
+</body>
+</html>
